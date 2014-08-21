@@ -306,16 +306,14 @@ function islandora_solr_metadata_config_form($form, &$form_state, $configuration
   // Loop through all of the values from the form state and database to
   // construct fields to be used within the modal.
   foreach ($data as $values) {
-    if (!isset($field_settings[$values['weight']])) {
-      $field_settings[$values['weight']] = array(
-        'solr_field' => $values['solr_field'],
-        'display_label' => isset($values['display_label']) ? $values['display_label'] : '',
-        'hyperlink' => isset($values['hyperlink']) ? $values['hyperlink'] : 0,
-        'date_format' => isset($values['date_format']) ? $values['date_format'] : NULL,
-        'permissions' => isset($values['permissions']) ? $values['permissions'] : array(),
-        'structured_data' => isset($values['structured_data']) ? $values['structured_data'] : NULL,
-      );
-    }
+    $field_settings[$values['weight']] = array(
+      'solr_field' => $values['solr_field'],
+      'display_label' => isset($values['display_label']) ? $values['display_label'] : '',
+      'hyperlink' => isset($values['hyperlink']) ? $values['hyperlink'] : 0,
+      'date_format' => isset($values['date_format']) ? $values['date_format'] : NULL,
+      'permissions' => isset($values['permissions']) ? $values['permissions'] : array(),
+      'structured_data' => isset($values['structured_data']) ? $values['structured_data'] : NULL,
+    );
   }
   $form_state['solr_field_settings'] = $field_settings;
   return $form;
@@ -558,6 +556,7 @@ function islandora_solr_metadata_management($data) {
           '#name' => 'display_fields_dialog_' . $value,
           '#id' => 'edit-islandora-solr-metadata-fields-terms-' . $value . '-dialog-button',
           '#ajax' => array(
+            // @TODO: Fix this wtf bbq gjdslkgjdasklgjdsaklgdsajklgdsajklgdsjlkdgsajkldgasjgklads.
             'callback' => '_islandora_solr_update_fields',
             'wrapper' => 'islandora-solr-metadata-fields-wrapper',
             'effect' => 'none',
@@ -607,6 +606,7 @@ function islandora_solr_metadata_management($data) {
  *   An associative array containing the form state.
  */
 function islandora_solr_metadata_update_fields_submit($form, &$form_state) {
+  dd('rebuild?');
   $form_state['rebuild'] = TRUE;
 }
 
@@ -640,7 +640,6 @@ function islandora_solr_metadata_admin_settings_field_configure($form, &$form_st
   $commands[] = ajax_command_invoke('#islandora-solr-metadata-admin-dialog-body', 'html', array($body));
   // Attach behaviors (re-attaches javascript).
   $commands[] = ajax_command_invoke(NULL, 'islandoraSolrMetadataAttachBehaviors', array());
-
   return array('#type' => 'ajax', '#commands' => $commands);
 }
 

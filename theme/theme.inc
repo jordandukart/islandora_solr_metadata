@@ -11,7 +11,7 @@ function theme_islandora_solr_metadata_management_table(array $variables) {
   $table = $variables['table'];
   $rows = array();
   $weight_class = 'islandora-solr-metadata-weight';
-  foreach (element_children($table['rows']) as $id) {
+  foreach (element_children($table['rows']) as $key => $id) {
     $row = &$table['rows'][$id];
     $row['weight']['#attributes'] = array('class' => array($weight_class));
     $rows[] = array(

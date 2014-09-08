@@ -37,11 +37,11 @@ function islandora_solr_metadata_config_form($form, &$form_state, $configuration
 
   // AJAX callback handling.
   if (isset($form_state['triggering_element'])) {
+    dsm($form_state, 'fstate');
+    // Look at this again: https://github.com/Islandora/islandora_solr_search/blob/7.x/includes/admin.inc#L705.
     if ($form_state['triggering_element']['#name'] == 'islandora-solr-metadata-add-field') {
       $field_to_add = array(
         'solr_field' => filter_xss($form_state['values']['islandora_solr_metadata_fields']['table_wrapper']['add_fieldset']['available_solr_fields']),
-        // Arbitrary large sort weight so it always comes last.
-        'weight' => 10000,
       );
     }
 
@@ -73,8 +73,13 @@ function islandora_solr_metadata_config_form($form, &$form_state, $configuration
     if ($form_state['triggering_element']['#value'] == t('Configure')) {
       // Triggered field #.
       $field = $form_state['triggering_element']['#field'];
-      // Get field values to be passed off to the modal.
-      $values = $form_state['solr_field_settings'][$field];
+      $values = $form_state['values']['islandora_solr_metadata_fields']['table_wrapper']['table']['table']['rows'][$field];
+      $solr_field = $values['solr_field'];
+      $solr_field_settings = (array) drupal_array_get_nested_value($form_state, array(
+        'solr_field_settings',
+        $solr_field,
+      ));
+      $values = array_merge_recursive($values, $solr_field_settings);
       // Prepare dialog values.
       $dialog_id = 'edit-islandora-solr-metadata-fields-terms-' . $field . '-dialog-button';
       $form_state['dialog'] = array(
@@ -86,6 +91,8 @@ function islandora_solr_metadata_config_form($form, &$form_state, $configuration
     if ($form_state['triggering_element']['#value'] == t('Dialog')) {
       // Triggered field #.
       $field = $form_state['triggering_element']['#field'];
+      // Get $solr_field;
+      $solr_field = $form_state['values']['islandora_solr_metadata_fields']['table_wrapper']['table']['table']['rows'][$field]['solr_field'];
       // Get dialog values from recent dialog submit.
       $dialog_values = $form_state['input']['_dialog_values'] = json_decode($form_state['input']['_dialog_values'], TRUE);
       $structured_data = array(
@@ -94,8 +101,7 @@ function islandora_solr_metadata_config_form($form, &$form_state, $configuration
         'value' => $dialog_values['value'],
       );
       // Save the dialog values in the form state.
-      $form_state['solr_field_settings'][$field] = array(
-        'solr_field' => $form_state['solr_field_settings'][$field]['solr_field'],
+      $form_state['solr_field_settings'][$solr_field] = array(
         'display_label' => $dialog_values['display_label'],
         'hyperlink' => empty($dialog_values['hyperlink']) ? 0 : 1,
         'date_format' => empty($dialog_values['date_format']) ? NULL : $dialog_values['date_format'],
@@ -305,10 +311,9 @@ function islandora_solr_metadata_config_form($form, &$form_state, $configuration
 
   // Loop through all of the values from the form state and database to
   // construct fields to be used within the modal.
-  foreach ($data as $values) {
-    if (!isset($field_settings[$values['weight']])) {
-      $field_settings[$values['weight']] = array(
-        'solr_field' => $values['solr_field'],
+  foreach ($data as $key => $values) {
+    if (!isset($field_settings[$values['solr_field']])) {
+      $field_settings[$values['solr_field']] = array(
         'display_label' => isset($values['display_label']) ? $values['display_label'] : '',
         'hyperlink' => isset($values['hyperlink']) ? $values['hyperlink'] : 0,
         'date_format' => isset($values['date_format']) ? $values['date_format'] : NULL,
@@ -507,16 +512,20 @@ function islandora_solr_metadata_management($data) {
   $rows = array();
 
   if ($data) {
-    uasort($data, 'drupal_sort_weight');
+    dsm($data, 'data');
+    //$data = array_values($data);
+    //uasort($data, 'drupal_sort_weight');
+    // Array values NEEDs to be here.
+    //$data = array_values($data);
+    dsm($data, 'after');
     $delta = count($data);
-    $map = function($field) use($delta) {
-      $value = $field['weight'];
-      return array(
+    foreach ($data as $key => $value) {
+      $rows[] = array(
         'remove_field' => array(
           '#type' => 'checkbox',
-          '#default_value' => isset($field['remove']) ? $field['remove'] : FALSE,
+          '#default_value' => isset($value['remove']) ? $value['remove'] : FALSE,
         ),
-        'solr_field_markup' => array('#markup' => filter_xss($field['solr_field'])),
+        'solr_field_markup' => array('#markup' => filter_xss($value['solr_field'])),
         'configure' => array(
           '#type' => 'link',
           '#title' => t('configure'),
@@ -532,15 +541,15 @@ function islandora_solr_metadata_management($data) {
         'configure_button' => array(
           '#type' => 'submit',
           '#value' => t('Configure'),
-          '#field' => $value,
+          '#field' => $key,
           '#attributes' => array(
             'class' => array(
               'islandora-solr-metadata-configure-submit',
             ),
           ),
           '#submit' => array('islandora_solr_metadata_update_fields_submit'),
-          '#name' => 'display_fields_configure_' . $value,
-          '#id' => 'edit-islandora-solr-metadata-fields-terms-' . $value . '-configure-button',
+          '#name' => 'display_fields_configure_' . $key,
+          '#id' => 'edit-islandora-solr-metadata-fields-terms-' . $key . '-configure-button',
           '#ajax' => array(
             'callback' => 'islandora_solr_metadata_admin_settings_field_configure',
             'wrapper' => 'islandora-solr-metadata-fields-wrapper',
@@ -552,13 +561,13 @@ function islandora_solr_metadata_management($data) {
         'dialog_button' => array(
           '#type' => 'submit',
           '#value' => t('Dialog'),
-          '#field' => $value,
+          '#field' => $key,
           '#attributes' => array('class' => array('islandora-solr-metadata-dialog-submit')),
           '#submit' => array('islandora_solr_metadata_update_fields_submit'),
-          '#name' => 'display_fields_dialog_' . $value,
-          '#id' => 'edit-islandora-solr-metadata-fields-terms-' . $value . '-dialog-button',
+          '#name' => 'display_fields_dialog_' . $key,
+          '#id' => 'edit-islandora-solr-metadata-fields-terms-' . $key . '-dialog-button',
           '#ajax' => array(
-            'callback' => '_islandora_solr_update_fields',
+            'callback' => 'islandora_solr_metadata_fields_ajax',
             'wrapper' => 'islandora-solr-metadata-fields-wrapper',
             'effect' => 'none',
             'event' => 'click',
@@ -568,17 +577,17 @@ function islandora_solr_metadata_management($data) {
         'weight' => array(
           '#type' => 'weight',
           '#title' => t('Weight'),
-          '#default_value' => $value,
-          '#delta' => $delta,
+          '#default_value' => isset($value['weight']) ? $value['weight'] : $key,
+          '#delta' => $delta >= 10 ? $delta : 10,
         ),
         'solr_field' => array(
           '#type' => 'value',
-          '#value' => filter_xss($field['solr_field']),
+          '#value' => filter_xss($value['solr_field']),
         ),
       );
-    };
-    $rows = array_map($map, $data);
+    }
   }
+
   // Add the table to the form.
   $form['#tree'] = TRUE;
   $form['table'] = array(
